@@ -87,6 +87,7 @@ function scaleCv() {
 /*==================== REMOVE THE SIZE WHEN THE CV IS DOWNLOADED ====================*/
 function removeScale() {
   document.body.classList.remove("scale-cv");
+  document.body.classList.remove("pdf-tight");
 }
 /*==================== GENERATE PDF ====================*/
 // PDF generated area
@@ -104,17 +105,32 @@ let opt = {
 
 // Function to call areaCv and Html2Pdf options
 function generateResume() {
-  html2pdf(areaCv, opt);
+  return html2pdf(areaCv, opt);
 }
 // Generate the current CV content from either download button.
-function downloadResume(event) {
+async function downloadResume(event) {
   if (event) event.preventDefault();
-  // 1. The class .scale-cv is added to the body, where it reduces the size of the elements
+
+  // Prepare the fixed A4 layout and wait until its font metrics are final.
   scaleCv();
-  // 2. The PDF is generated
-  generateResume();
-  // 3. The .scale-cv class is removed from the body after 5 seconds to return to normal size.
-  setTimeout(removeScale, 5000);
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  // Only use the tighter typography when the regular PDF layout overflows A4.
+  const columns = areaCv.querySelectorAll(".resume__left, .resume__right");
+  const hasOverflow = Array.from(columns).some(
+    (column) => column.scrollHeight > column.clientHeight
+  );
+  if (hasOverflow) {
+    document.body.classList.add("pdf-tight");
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+
+  try {
+    await generateResume();
+  } finally {
+    removeScale();
+  }
 }
 
 resumeButton.addEventListener("click", downloadResume);
